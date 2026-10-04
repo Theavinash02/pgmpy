@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Hashable
+from collections.abc import Hashable, Iterable
 
 import numpy as np
 
@@ -12,8 +12,8 @@ class _Timeseriescoregraph(_Coregraph):
         self,
         tau_max: int | None = None,
     ):
-
         self._set_tau_max(tau_max)
+        super().__init__()
 
     def _set_tau_max(self, tau_max: int | None) -> None:
         if tau_max is not None:
@@ -59,3 +59,36 @@ class _Timeseriescoregraph(_Coregraph):
         if node is None:
             raise TypeError("Variabe names must be hashable and not None. Got None")
         return (node, 0)
+
+    def _normalize_edge(self, u, v, edge_type: str) -> tuple:
+
+        u, v = self._normalize_node(u), self._normalize_node(v)
+        lag = v[1] - u[1]
+        if lag < 0:
+            markers = self._to_markers((u, v, edge_type))
+            u, v, edge_type = v, u, self._to_edge_type(v, u, markers)
+            lag = -lag
+        return ((u[0], -lag), (v[0], 0), edge_type)
+
+    def add_node(self, node: Hashable, **attr) -> None:
+        node = self._normalize_node(node)
+        if not super().has_node(node):
+            node = (node[0], 0)
+        super().add_node(node, **attr)
+
+    def add_nodes_from(self, nodes: Iterable[Hashable], **attr) -> None:
+        for node in nodes:
+            self.add_node(node, **attr)
+
+    def add_edge(self, u: Hashable, v: Hashable, edge_type: str) -> None:
+        u, v, edge_type = self._normalize_edge(u, v, edge_type)
+        self._check_lag(-u[1])
+        super().add_edge(u, v, edge_type=edge_type)
+
+    def remove_edge(self, u: Hashable, v: Hashable, edge_type: str) -> None:
+        u, v, edge_type = self._normalize_edge(u, v, edge_type)
+        super().remove_edge(u, v, edge_type=edge_type)
+
+    def has_edge(self, u: Hashable, v: Hashable, edge_type: str | None = None) -> bool:
+        u, v, edge_type = self._normalize_edge(u, v, edge_type or "--")
+        return super().has_edge(u, v, edge_type if edge_type != "--" else None)
