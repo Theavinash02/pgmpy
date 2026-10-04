@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Hashable
+
 import numpy as np
 
 from pgmpy.base._base import _Coregraph
@@ -40,3 +42,20 @@ class _Timeseriescoregraph(_Coregraph):
                 )
         else:
             self._tau_max = max(self._tau_max, lag)
+
+    @staticmethod
+    def _normalize_node(node) -> tuple:
+        if hasattr(node, "to_tuple"):
+            node = node.to_tuple()
+        if isinstance(node, (tuple, list)):
+            if len(node) != 2:
+                raise ValueError(f"Node must be (variable, lag) pair. Got : {tuple(node)}")
+            var, offset = node
+            if isinstance(offset, bool) or not isinstance(offset, (int, np.integer)):
+                raise TypeError(f"The time of node {(var, offset)} must be an integer, got {type(offset)}")
+            if var is None or not isinstance(var, Hashable):
+                raise TypeError(f"Variable names must be hashable and not None. Got {var} of type {type(var)}")
+            return var, offset
+        if node is None:
+            raise TypeError("Variabe names must be hashable and not None. Got None")
+        return (node, 0)
